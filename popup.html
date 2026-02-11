@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      color: #333;
+      padding: 16px;
+    }
+    h1 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #666;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ccc;
+      flex-shrink: 0;
+    }
+    .status-dot.connecting { background: #f59e0b; }
+    .status-dot.ready      { background: #3b82f6; }
+    .status-dot.card       { background: #10b981; }
+    .status-dot.error      { background: #ef4444; }
+
+    .section {
+      margin-bottom: 12px;
+    }
+    .label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #999;
+      margin-bottom: 4px;
+    }
+    .value {
+      font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+      font-size: 13px;
+      color: #333;
+      background: #f5f5f5;
+      padding: 8px 10px;
+      border-radius: 6px;
+      word-break: break-all;
+      min-height: 32px;
+    }
+    .uid .value {
+      font-size: 20px;
+      font-weight: 600;
+      text-align: center;
+      letter-spacing: 2px;
+      color: #1a1a1a;
+    }
+    .empty {
+      color: #bbb;
+      font-style: italic;
+      font-weight: normal;
+      font-size: 13px;
+      letter-spacing: normal;
+    }
+    .error-msg {
+      color: #ef4444;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Smart Card Reader</h1>
+
+  <div class="status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Initializing...</span>
+  </div>
+
+  <div class="section">
+    <div class="label">Reader</div>
+    <div class="value" id="readerName"><span class="empty">No reader detected</span></div>
+  </div>
+
+  <div class="section uid">
+    <div class="label">Card UID</div>
+    <div class="value" id="cardUid"><span class="empty">No card</span></div>
+  </div>
+
+  <div class="section">
+    <div class="label">ATR</div>
+    <div class="value" id="cardAtr"><span class="empty">—</span></div>
+  </div>
+
+  <div id="errorMsg" class="error-msg"></div>
+
+  <script src="pcsc-client.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

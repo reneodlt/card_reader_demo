@@ -157,7 +157,7 @@ class PcscClient {
    */
   async transmit(cardHandle, protocol, apdu) {
     const pci = (protocol === SCARD_PROTOCOL_T0) ? SCARD_PCI_T0 : SCARD_PCI_T1;
-    const result = await this._call('SCardTransmit', [cardHandle, pci, apdu]);
+    const result = await this._call('SCardTransmit', [cardHandle, pci, apdu, null]);
     // result[0] = ioRecvPci, result[1] = response bytes
     return result[1];
   }

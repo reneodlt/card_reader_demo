@@ -13,6 +13,10 @@ const ui = {
   errorMsg: document.getElementById('errorMsg'),
   modeBadge: document.getElementById('modeBadge'),
   openSettings: document.getElementById('openSettings'),
+  apiRequest: document.getElementById('apiRequest'),
+  apiRequestTs: document.getElementById('apiRequestTs'),
+  apiResponse: document.getElementById('apiResponse'),
+  apiResponseTs: document.getElementById('apiResponseTs'),
 };
 
 const STATUS_LABELS = {
@@ -54,11 +58,46 @@ function render(state, settings) {
   // Error
   ui.errorMsg.textContent = state.error || '';
 
+  // API debug
+  if (state.apiRequest) {
+    const r = state.apiRequest;
+    ui.apiRequest.textContent = 'POST ' + r.url + '\n' + JSON.stringify(r.body, null, 2);
+    ui.apiRequest.className = 'api-value';
+    ui.apiRequestTs.textContent = formatTs(r.timestamp);
+  } else {
+    ui.apiRequest.innerHTML = '<span class="empty">No request yet</span>';
+    ui.apiRequest.className = 'api-value';
+    ui.apiRequestTs.textContent = '';
+  }
+
+  if (state.apiResponse) {
+    const r = state.apiResponse;
+    if (r.error) {
+      ui.apiResponse.textContent = 'ERROR: ' + r.error;
+      ui.apiResponse.className = 'api-value err';
+    } else {
+      const body = typeof r.body === 'object' ? JSON.stringify(r.body, null, 2) : r.body;
+      ui.apiResponse.textContent = r.status + ' ' + body;
+      ui.apiResponse.className = 'api-value ' + (r.status >= 200 && r.status < 300 ? 'ok' : 'err');
+    }
+    ui.apiResponseTs.textContent = formatTs(r.timestamp);
+  } else {
+    ui.apiResponse.innerHTML = '<span class="empty">No response yet</span>';
+    ui.apiResponse.className = 'api-value';
+    ui.apiResponseTs.textContent = '';
+  }
+
   // Mode badge
   if (settings) {
     const modeLabel = settings.detectionMode === 'poll' ? 'Polling mode' : 'Event mode';
     ui.modeBadge.textContent = modeLabel;
   }
+}
+
+function formatTs(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleTimeString();
 }
 
 // --- Communication with background ---

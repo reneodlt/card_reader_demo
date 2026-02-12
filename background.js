@@ -17,6 +17,8 @@ let currentState = {
   cardUid: null,
   cardAtr: null,
   error: null,
+  apiRequest: null,   // { url, body, timestamp }
+  apiResponse: null,  // { status, body, timestamp } or { error, timestamp }
 };
 
 let settings = {
@@ -72,6 +74,59 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
+// --- Endpoint call ---
+
+async function callEndpoint(cardUid) {
+  if (!settings.endpointUrl) {
+    console.log('[bg] No endpoint URL configured, skipping API call');
+    return;
+  }
+
+  const url = settings.endpointUrl;
+  const body = {
+    card_id: cardUid,
+    venue_id: settings.venueId,
+  };
+
+  const apiRequest = {
+    url,
+    body,
+    timestamp: new Date().toISOString(),
+  };
+  updateState({ apiRequest, apiResponse: null });
+
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    let respBody;
+    const contentType = resp.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      respBody = await resp.json();
+    } else {
+      respBody = await resp.text();
+    }
+
+    const apiResponse = {
+      status: resp.status,
+      body: respBody,
+      timestamp: new Date().toISOString(),
+    };
+    updateState({ apiResponse });
+    console.log('[bg] API response:', resp.status, respBody);
+  } catch (e) {
+    const apiResponse = {
+      error: e.message,
+      timestamp: new Date().toISOString(),
+    };
+    updateState({ apiResponse });
+    console.warn('[bg] API call failed:', e.message);
+  }
+}
+
 // --- Card reading ---
 
 async function readCard(readerName) {
@@ -98,8 +153,15 @@ async function readCard(readerName) {
       cardUid: uid,
       cardAtr: atr,
       error: null,
+      apiRequest: null,
+      apiResponse: null,
     });
     console.log('[bg] Card UID:', uid);
+
+    // Call the configured endpoint
+    if (uid) {
+      await callEndpoint(uid);
+    }
   } catch (e) {
     updateState({ status: 'error', error: 'Failed to read card: ' + e.message });
   }

@@ -2,9 +2,13 @@
  * Popup logic for the Smart Card Reader extension.
  * Connects to Smart Card Connector, discovers readers, polls for cards,
  * and displays the card UID.
+ *
+ * Strategy: connect to the card once, hold the handle, and use SCardStatus
+ * to detect removal — avoids repeated connect/disconnect that causes the
+ * reader LED to blink.
  */
 
-const POLL_INTERVAL_MS = 1000;
+const POLL_INTERVAL_MS = 1500;
 
 const ui = {
   statusDot: document.getElementById('statusDot'),
@@ -17,7 +21,9 @@ const ui = {
 
 let client = null;
 let pollTimer = null;
-let lastUid = null;
+
+// Current card session (null when no card is connected)
+let activeCard = null; // { handle, protocol, uid, atr }
 
 // --- UI helpers ---
 
@@ -90,7 +96,25 @@ async function poll() {
   if (!client) return;
 
   try {
-    // List available readers
+    // If we already have a card connected, just check it's still there
+    if (activeCard) {
+      try {
+        await client.status(activeCard.handle);
+        // Card still present — nothing to do
+        return;
+      } catch (e) {
+        // Card removed or error — clean up
+        try { await client.disconnect(activeCard.handle); } catch (_) {}
+        activeCard = null;
+        setStatus('ready', 'Waiting for card...');
+        setUid(null);
+        setAtr(null);
+        clearError();
+        return;
+      }
+    }
+
+    // No active card — check for readers and try to connect
     const readers = await client.listReaders();
 
     if (!readers || readers.length === 0) {
@@ -98,7 +122,6 @@ async function poll() {
       setReader(null);
       setUid(null);
       setAtr(null);
-      lastUid = null;
       return;
     }
 
@@ -112,44 +135,37 @@ async function poll() {
     } catch (e) {
       // No card present — this is normal
       setStatus('ready', 'Waiting for card...');
-      setUid(null);
-      setAtr(null);
-      lastUid = null;
       clearError();
       return;
     }
 
-    // Card is present — read UID
+    // Card connected — read UID and ATR once, then hold the handle
     setStatus('card', 'Card detected');
     clearError();
 
+    let uid = null;
+    let atr = null;
+
     try {
-      const uid = await client.readCardUid(card.handle, card.protocol);
+      uid = await client.readCardUid(card.handle, card.protocol);
       setUid(uid);
-      lastUid = uid;
     } catch (e) {
       setUid(null);
       showError('Failed to read UID: ' + e.message);
     }
 
-    // Read ATR via SCardStatus
     try {
       const st = await client.status(card.handle);
       if (st.atr && st.atr.length > 0) {
-        setAtr(bytesToHex(st.atr));
-      } else {
-        setAtr(null);
+        atr = bytesToHex(st.atr);
+        setAtr(atr);
       }
     } catch (e) {
       setAtr(null);
     }
 
-    // Disconnect from the card so the next poll can reconnect
-    try {
-      await client.disconnect(card.handle);
-    } catch (e) {
-      // ignore disconnect errors
-    }
+    // Keep the handle open — we'll check status on subsequent polls
+    activeCard = { handle: card.handle, protocol: card.protocol, uid, atr };
 
   } catch (e) {
     // Context-level error (connector disconnected, etc.)
@@ -165,6 +181,10 @@ window.addEventListener('load', init);
 
 window.addEventListener('unload', () => {
   stopPolling();
+  if (activeCard) {
+    try { client.disconnect(activeCard.handle); } catch (_) {}
+    activeCard = null;
+  }
   if (client) {
     client.dispose();
     client = null;

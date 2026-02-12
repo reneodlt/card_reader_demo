@@ -1,0 +1,39 @@
+Read contactless smart card (RFID/NFC) UIDs directly in Chrome and send them to your own API endpoint.
+
+Smart Card Reader connects to a locally attached PC/SC-compatible card reader (such as ACR122U or HID OMNIKEY) via Google's Smart Card Connector extension and displays card information in a clean popup window.
+
+HOW IT WORKS
+1. Connect a contactless card reader to your device
+2. Install the Smart Card Connector extension (required)
+3. Configure your API endpoint URL in Settings
+4. Tap a card — the UID is read instantly and POSTed to your endpoint
+
+FEATURES
+• Reads card UID and ATR from any PC/SC contactless reader
+• Identifies card type automatically (MIFARE Classic, Ultralight, Plus, FeliCa, and more)
+• Two detection modes: event-driven (efficient, blocks until card state changes) or polling (fallback)
+• Sends card data as JSON to any HTTP/HTTPS endpoint you configure
+• Built-in API debug panel: view full request/response with headers, status codes, and round-trip timing
+• Resend or edit-and-resend API requests to debug your endpoint integration
+• Rolling event log showing card detections, removals, API calls, and errors with timestamps
+• Auto-generated device UUID for identifying the reader source
+• Works on ChromeOS and any Chrome browser with Smart Card Connector support
+
+USE CASES
+• Venue access control and attendance tracking
+• Membership card scanning at point-of-entry
+• Asset tracking with RFID tags
+• Rapid prototyping of smart card integrations
+• Testing and debugging card reader ↔ API workflows
+
+PRIVACY
+This extension only sends data to the endpoint URL you configure. There is no built-in server, no analytics, no telemetry, and no tracking. Card data is held in memory only and is not persisted to disk. See our full privacy policy for details.
+
+REQUIREMENTS
+• Chrome / ChromeOS 116 or later
+• Smart Card Connector extension (by Google)
+• A PC/SC-compatible contactless card reader
+
+PERMISSIONS
+• Storage — saves your preferences locally (endpoint URL, venue ID, detection mode)
+• Alarms — keeps the background worker alive to maintain the card reader connection

@@ -5,7 +5,7 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      width: 320px;
+      width: 420px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       font-size: 14px;
       color: #333;
@@ -84,6 +84,25 @@
       font-size: 13px;
       letter-spacing: normal;
     }
+    .card-info {
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .card-info-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card-info-key {
+      color: #999;
+      font-size: 10px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .card-info-val {
+      text-align: right;
+      word-break: break-all;
+    }
     .error-msg {
       color: #ef4444;
       font-size: 12px;
@@ -94,14 +113,38 @@
       border-top: 1px solid #eee;
       margin: 14px 0;
     }
-    .debug-header {
+
+    /* --- Tabs --- */
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 10px;
+      border-bottom: 2px solid #eee;
+    }
+    .tab {
+      padding: 6px 14px;
       font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: #999;
-      margin-bottom: 8px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
     }
+    .tab:hover { color: #666; }
+    .tab.active {
+      color: #1e40af;
+      border-bottom-color: #1e40af;
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* --- API Debug --- */
     .api-block {
       margin-bottom: 10px;
     }
@@ -110,6 +153,9 @@
       font-weight: 600;
       color: #999;
       margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
     .api-value {
       font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
@@ -120,7 +166,7 @@
       border-radius: 4px;
       word-break: break-all;
       white-space: pre-wrap;
-      max-height: 120px;
+      max-height: 160px;
       overflow-y: auto;
     }
     .api-value.ok { border-left: 3px solid #10b981; }
@@ -132,6 +178,161 @@
       text-align: right;
       margin-top: 2px;
     }
+    .api-duration {
+      font-size: 10px;
+      color: #999;
+      font-weight: normal;
+    }
+
+    /* --- Resend controls --- */
+    .resend-bar {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      margin-bottom: 10px;
+    }
+    .btn {
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #fff;
+      color: #333;
+      cursor: pointer;
+    }
+    .btn:hover { background: #f5f5f5; border-color: #bbb; }
+    .btn.primary {
+      background: #1e40af;
+      color: #fff;
+      border-color: #1e40af;
+    }
+    .btn.primary:hover { background: #1e3a8a; }
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* --- Edit mode --- */
+    .edit-section {
+      display: none;
+      margin-bottom: 10px;
+    }
+    .edit-section.active { display: block; }
+    .edit-section label {
+      display: block;
+      font-size: 10px;
+      font-weight: 600;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 3px;
+      margin-top: 8px;
+    }
+    .edit-section label:first-child { margin-top: 0; }
+    .edit-section input[type="text"] {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+      font-size: 11px;
+      outline: none;
+    }
+    .edit-section input[type="text"]:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
+    }
+    .edit-section textarea {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+      font-size: 11px;
+      resize: vertical;
+      min-height: 80px;
+      outline: none;
+    }
+    .edit-section textarea:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
+    }
+    .edit-error {
+      font-size: 10px;
+      color: #ef4444;
+      margin-top: 3px;
+      display: none;
+    }
+
+    /* --- Response headers toggle --- */
+    .headers-toggle {
+      font-size: 10px;
+      color: #3b82f6;
+      cursor: pointer;
+      display: inline;
+      border: none;
+      background: none;
+      padding: 0;
+      text-decoration: underline;
+    }
+    .headers-toggle:hover { color: #1e40af; }
+    .resp-headers {
+      display: none;
+      font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+      font-size: 10px;
+      color: #666;
+      background: #fafafa;
+      padding: 6px 8px;
+      border-radius: 4px;
+      margin-top: 4px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+    .resp-headers.visible { display: block; }
+
+    /* --- Debug log --- */
+    .log-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 6px;
+    }
+    .log-container {
+      max-height: 260px;
+      overflow-y: auto;
+      background: #1e1e1e;
+      border-radius: 6px;
+      padding: 8px;
+      font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+      font-size: 10px;
+      line-height: 1.6;
+    }
+    .log-entry {
+      color: #d4d4d4;
+      border-bottom: 1px solid #2a2a2a;
+      padding: 2px 0;
+    }
+    .log-entry:last-child { border-bottom: none; }
+    .log-ts { color: #666; }
+    .log-level-info { color: #3b82f6; }
+    .log-level-warn { color: #f59e0b; }
+    .log-level-error { color: #ef4444; }
+    .log-msg { color: #d4d4d4; }
+    .log-detail {
+      color: #888;
+      padding-left: 16px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .log-empty {
+      color: #666;
+      font-style: italic;
+      padding: 12px;
+      text-align: center;
+    }
+
     .mode-badge {
       font-size: 10px;
       color: #999;
@@ -166,21 +367,69 @@
     <div class="value" id="cardAtr"><span class="empty">—</span></div>
   </div>
 
+  <div class="section" id="cardInfoSection" style="display:none;">
+    <div class="label">Card Info</div>
+    <div class="value card-info" id="cardInfo"></div>
+  </div>
+
   <div id="errorMsg" class="error-msg"></div>
 
   <hr class="divider">
-  <div class="debug-header">API Debug</div>
 
-  <div class="api-block">
-    <div class="api-label">REQUEST</div>
-    <div class="api-value" id="apiRequest"><span class="empty">No request yet</span></div>
-    <div class="api-ts" id="apiRequestTs"></div>
+  <!-- Tabs: API Debug / Event Log -->
+  <div class="tabs">
+    <button class="tab active" data-tab="api">API Debug</button>
+    <button class="tab" data-tab="log">Event Log</button>
   </div>
 
-  <div class="api-block">
-    <div class="api-label">RESPONSE</div>
-    <div class="api-value" id="apiResponse"><span class="empty">No response yet</span></div>
-    <div class="api-ts" id="apiResponseTs"></div>
+  <!-- API Debug panel -->
+  <div class="tab-panel active" id="panel-api">
+
+    <div class="api-block">
+      <div class="api-label">REQUEST</div>
+      <div class="api-value" id="apiRequest"><span class="empty">No request yet</span></div>
+      <div class="api-ts" id="apiRequestTs"></div>
+    </div>
+
+    <div class="api-block">
+      <div class="api-label">
+        RESPONSE
+        <span class="api-duration" id="apiDuration"></span>
+      </div>
+      <div class="api-value" id="apiResponse"><span class="empty">No response yet</span></div>
+      <div class="api-ts" id="apiResponseTs"></div>
+      <button class="headers-toggle" id="headersToggle" style="display:none;">Show headers</button>
+      <div class="resp-headers" id="respHeaders"></div>
+    </div>
+
+    <!-- Resend / Edit+Resend controls -->
+    <div class="resend-bar">
+      <button class="btn primary" id="resendBtn" disabled>Resend</button>
+      <button class="btn" id="editToggleBtn" disabled>Edit & Resend</button>
+    </div>
+
+    <!-- Editable request fields (hidden by default) -->
+    <div class="edit-section" id="editSection">
+      <label for="editUrl">URL</label>
+      <input type="text" id="editUrl" placeholder="https://api.example.com/cardread">
+      <label for="editBody">Body (JSON)</label>
+      <textarea id="editBody" placeholder='{"card_id": "...", "venue_id": "..."}'></textarea>
+      <div class="edit-error" id="editError">Invalid JSON</div>
+      <div class="resend-bar" style="margin-top: 6px;">
+        <button class="btn primary" id="sendEditedBtn">Send</button>
+        <button class="btn" id="cancelEditBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Event Log panel -->
+  <div class="tab-panel" id="panel-log">
+    <div class="log-toolbar">
+      <button class="btn" id="clearLogBtn">Clear</button>
+    </div>
+    <div class="log-container" id="logContainer">
+      <div class="log-empty">No events yet</div>
+    </div>
   </div>
 
   <div class="mode-badge" id="modeBadge"></div>

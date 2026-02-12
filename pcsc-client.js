@@ -282,3 +282,135 @@ function bytesToHex(bytes) {
     .map(b => b.toString(16).toUpperCase().padStart(2, '0'))
     .join(':');
 }
+
+/**
+ * Known RID (Registered Application Provider Identifier) values for
+ * contactless cards — the first 5 bytes of the AID in ATR historical bytes.
+ */
+const KNOWN_RIDS = {
+  'A000000306': 'NXP (PC/SC standard)',
+  'A000000003': 'Visa',
+  'A000000004': 'Mastercard',
+  'A000000065': 'JCB',
+  'D276000085': 'NFC Forum',
+};
+
+/**
+ * Known card types by standard byte (byte 0 of historical bytes after
+ * category indicator for storage cards via PC/SC part 3).
+ * Maps ss:cc from bytes 3-4 of the "standard card ID" portion.
+ */
+const KNOWN_CARD_STANDARDS = {
+  '0001': 'ISO 14443 A, Part 1',
+  '0002': 'ISO 14443 A, Part 2',
+  '0003': 'ISO 14443 A, Part 3',
+  '0005': 'ISO 14443 B, Part 1',
+  '0006': 'ISO 14443 B, Part 2',
+  '0007': 'ISO 14443 B, Part 3',
+};
+
+const KNOWN_CARD_NAMES = {
+  '0001': 'MIFARE Classic 1K',
+  '0002': 'MIFARE Classic 4K',
+  '0003': 'MIFARE Ultralight',
+  '0026': 'MIFARE Mini',
+  '003A': 'MIFARE Ultralight C',
+  '003B': 'MIFARE Ultralight EV1',
+  '0036': 'MIFARE Plus 2K SL1',
+  '0037': 'MIFARE Plus 4K SL1',
+  '0038': 'MIFARE Plus 2K SL2',
+  '0039': 'MIFARE Plus 4K SL2',
+  'F004': 'Topaz 512',
+  'F011': 'FeliCa 212K',
+  'F012': 'FeliCa 424K',
+  'FF28': 'JCOP 31/36',
+  'FF40': 'Java Card',
+  'FF88': 'Infineon SLE 66R35',
+};
+
+/**
+ * Parse ATR bytes to extract card metadata.
+ * Returns { cardType, standard, cardName, rid, historicalBytes }.
+ */
+function parseAtr(atrBytes) {
+  const result = {
+    cardType: null,
+    standard: null,
+    cardName: null,
+    rid: null,
+    historicalBytes: null,
+  };
+
+  if (!atrBytes || atrBytes.length < 2) return result;
+
+  // Find historical bytes: T0 byte is atrBytes[1], lower nibble = number of historical bytes
+  const t0 = atrBytes[1];
+  const numHistorical = t0 & 0x0F;
+
+  if (numHistorical === 0) return result;
+
+  // Historical bytes start after the interface bytes.
+  // Walk interface bytes according to T0 and TD(i) indicators.
+  let idx = 2;
+  let td = t0;
+  while (td & 0xF0) {
+    if (td & 0x10) idx++; // TA(i)
+    if (td & 0x20) idx++; // TB(i)
+    if (td & 0x40) idx++; // TC(i)
+    if (td & 0x80) {
+      td = atrBytes[idx] || 0;
+      idx++;
+    } else {
+      break;
+    }
+  }
+
+  if (idx + numHistorical > atrBytes.length) return result;
+
+  const historicalBytes = atrBytes.slice(idx, idx + numHistorical);
+  result.historicalBytes = bytesToHex(historicalBytes);
+
+  // PC/SC Part 3 supplemental: category indicator 0x80 means
+  // the bytes follow a compact-TLV structure.
+  // Many contactless readers present the AID in a specific format.
+  if (numHistorical >= 5 && historicalBytes[0] === 0x80) {
+    // Look for an application identifier TLV (tag 0x4F)
+    let i = 1;
+    while (i < historicalBytes.length - 1) {
+      const tag = historicalBytes[i];
+      const len = historicalBytes[i + 1];
+      if (tag === 0x4F && len >= 5) {
+        // AID: RID (5 bytes) + optional PIX
+        const ridBytes = historicalBytes.slice(i + 2, i + 2 + 5);
+        const ridHex = ridBytes.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join('');
+        result.rid = KNOWN_RIDS[ridHex] || ridHex;
+
+        // For PC/SC storage cards (RID A000000306), bytes after RID are:
+        // SS (standard) CC (card name)
+        if (ridHex === 'A000000306' && len >= 7) {
+          const ss = historicalBytes[i + 2 + 5].toString(16).toUpperCase().padStart(2, '0');
+          const nn = historicalBytes[i + 2 + 6].toString(16).toUpperCase().padStart(2, '0');
+          const ssKey = '00' + ss;
+          const nnKey = '00' + nn;
+          result.standard = KNOWN_CARD_STANDARDS[ssKey] || 'Standard 0x' + ss;
+          result.cardName = KNOWN_CARD_NAMES[nnKey] || 'Type 0x' + nn;
+        }
+        break;
+      }
+      i += 2 + len;
+    }
+  }
+
+  // Simpler heuristic: many readers use the ATR format where bytes at
+  // fixed positions indicate card type for contactless readers.
+  // E.g. ATR starting with 3B:8F:80:01 ... where historical bytes at
+  // offset 4 from the end contain the card type code.
+  if (!result.cardName && atrBytes.length >= 6) {
+    // Check for common NXP contactless ATR pattern: 3B:8x:80:01
+    if (atrBytes[0] === 0x3B && (atrBytes[1] & 0xF0) === 0x80 && atrBytes[2] === 0x80 && atrBytes[3] === 0x01) {
+      result.cardType = 'Contactless (ISO 14443)';
+    }
+  }
+
+  return result;
+}

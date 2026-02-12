@@ -25,6 +25,7 @@ let settings = {
   detectionMode: 'event',  // 'event' or 'poll'
   endpointUrl: '',
   venueId: '',
+  clientId: '',
 };
 
 const POLL_INTERVAL_MS = 1500;
@@ -33,10 +34,19 @@ const STATUS_CHANGE_TIMEOUT = 60000; // 60s per SCardGetStatusChange call, then 
 // --- Settings ---
 
 async function loadSettings() {
-  const stored = await chrome.storage.local.get(['detectionMode', 'endpointUrl', 'venueId']);
+  const stored = await chrome.storage.local.get(['detectionMode', 'endpointUrl', 'venueId', 'clientId']);
   settings.detectionMode = stored.detectionMode || 'event';
   settings.endpointUrl = stored.endpointUrl || '';
   settings.venueId = stored.venueId || '';
+
+  // Generate client ID on first run
+  if (!stored.clientId) {
+    settings.clientId = crypto.randomUUID();
+    await chrome.storage.local.set({ clientId: settings.clientId });
+    console.log('[bg] Generated new client ID:', settings.clientId);
+  } else {
+    settings.clientId = stored.clientId;
+  }
 }
 
 // React to settings changes — restart the monitoring loop
@@ -49,6 +59,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   if (changes.endpointUrl) settings.endpointUrl = changes.endpointUrl.newValue;
   if (changes.venueId) settings.venueId = changes.venueId.newValue;
+  if (changes.clientId) settings.clientId = changes.clientId.newValue;
 
   if (modeChanged) {
     console.log('[bg] Detection mode changed to:', settings.detectionMode);
@@ -86,6 +97,7 @@ async function callEndpoint(cardUid) {
   const body = {
     card_id: cardUid,
     venue_id: settings.venueId,
+    client_id: settings.clientId,
   };
 
   const apiRequest = {

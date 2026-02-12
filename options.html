@@ -84,6 +84,16 @@
       transition: opacity 0.2s;
     }
     .saved.visible { opacity: 1; }
+    .readonly-value {
+      font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+      font-size: 12px;
+      color: #666;
+      background: #f5f5f5;
+      padding: 8px 10px;
+      border-radius: 6px;
+      word-break: break-all;
+      user-select: all;
+    }
   </style>
 </head>
 <body>
@@ -117,6 +127,11 @@
   <div class="field">
     <label for="venueId">Venue ID</label>
     <input type="text" id="venueId" placeholder="venue-001">
+  </div>
+
+  <div class="field">
+    <label>Client ID</label>
+    <div class="readonly-value" id="clientId">—</div>
   </div>
 
   <div class="actions">

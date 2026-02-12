@@ -7,12 +7,13 @@ const els = {
   modePoll: document.getElementById('modePoll'),
   endpointUrl: document.getElementById('endpointUrl'),
   venueId: document.getElementById('venueId'),
+  clientId: document.getElementById('clientId'),
   saveBtn: document.getElementById('saveBtn'),
   savedMsg: document.getElementById('savedMsg'),
 };
 
 async function load() {
-  const stored = await chrome.storage.local.get(['detectionMode', 'endpointUrl', 'venueId']);
+  const stored = await chrome.storage.local.get(['detectionMode', 'endpointUrl', 'venueId', 'clientId']);
 
   if (stored.detectionMode === 'poll') {
     els.modePoll.checked = true;
@@ -22,6 +23,7 @@ async function load() {
 
   els.endpointUrl.value = stored.endpointUrl || '';
   els.venueId.value = stored.venueId || '';
+  els.clientId.textContent = stored.clientId || 'Not yet generated (open popup first)';
 }
 
 async function save() {

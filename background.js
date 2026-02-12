@@ -394,7 +394,12 @@ async function runPollLoop() {
       try {
         card = await client.connectCard(readerName);
       } catch (e) {
-        // No card — normal
+        // If the client lost its connection/context, break so we can recover
+        if (!client.isConnected()) {
+          updateState({ status: 'error', readerName: null, error: 'Lost connection: ' + e.message });
+          break;
+        }
+        // Otherwise it's a normal "no card present" condition
         if (currentState.status !== 'ready') {
           updateState({ status: 'ready', cardUid: null, cardAtr: null, error: null });
         }
@@ -450,6 +455,8 @@ async function start() {
   } catch (e) {
     updateState({ status: 'error', error: 'Failed to connect to Smart Card Connector: ' + e.message });
     addLog('error', 'Failed to connect to Smart Card Connector', e.message);
+    running = false;
+    client = null;
     return;
   }
 
@@ -461,6 +468,18 @@ async function start() {
     await runEventLoop();
   } else {
     await runPollLoop();
+  }
+
+  // If we reach here the loop exited — either intentionally via restart()
+  // (which sets running=false) or unexpectedly due to a connection error.
+  // In the latter case, schedule auto-recovery so the keepalive can restart.
+  if (running) {
+    console.log('[bg] Monitoring loop exited unexpectedly, scheduling recovery');
+    addLog('warn', 'Connection lost, recovering in 2s…');
+    running = false;
+    if (client) { client.dispose(); client = null; }
+    await sleep(2000);
+    start();
   }
 }
 
@@ -484,9 +503,11 @@ function sleep(ms) {
 chrome.alarms.create('keepalive', { periodInMinutes: 0.5 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'keepalive') {
-    if (!running || !client) {
-      console.log('[bg] Keepalive: restarting...');
-      start();
+    const needsRestart = !running || !client || !client.isConnected();
+    if (needsRestart) {
+      console.log('[bg] Keepalive: not healthy, restarting...');
+      addLog('warn', 'Keepalive detected stale connection, restarting');
+      restart();
     }
   }
 });

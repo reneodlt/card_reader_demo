@@ -248,6 +248,13 @@ class PcscClient {
   }
 
   /**
+   * Check whether the client still has a live port and context.
+   */
+  isConnected() {
+    return !this._disposed && this._port !== null && this._context !== null;
+  }
+
+  /**
    * Tear down the connection.
    */
   dispose() {

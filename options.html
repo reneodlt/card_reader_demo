@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 360px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      color: #333;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .field {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #999;
+      margin-bottom: 6px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+      outline: none;
+    }
+    input[type="text"]:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
+    }
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .radio-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .radio-option input { margin-top: 2px; }
+    .radio-label { font-size: 13px; }
+    .radio-desc {
+      font-size: 11px;
+      color: #999;
+      margin-top: 1px;
+    }
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    button {
+      padding: 8px 20px;
+      background: #1e40af;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #1e3a8a; }
+    .saved {
+      font-size: 13px;
+      color: #10b981;
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .saved.visible { opacity: 1; }
+  </style>
+</head>
+<body>
+  <h1>Settings</h1>
+
+  <div class="field">
+    <label>Detection Mode</label>
+    <div class="radio-group">
+      <label class="radio-option">
+        <input type="radio" name="detectionMode" value="event" id="modeEvent">
+        <div>
+          <div class="radio-label">Event-driven (SCardGetStatusChange)</div>
+          <div class="radio-desc">Blocks until card state changes. Efficient, no polling.</div>
+        </div>
+      </label>
+      <label class="radio-option">
+        <input type="radio" name="detectionMode" value="poll" id="modePoll">
+        <div>
+          <div class="radio-label">Polling (SCardStatus)</div>
+          <div class="radio-desc">Checks card status periodically. Fallback if event mode has issues.</div>
+        </div>
+      </label>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="endpointUrl">Endpoint URL</label>
+    <input type="text" id="endpointUrl" placeholder="https://api.example.com/cardread">
+  </div>
+
+  <div class="field">
+    <label for="venueId">Venue ID</label>
+    <input type="text" id="venueId" placeholder="venue-001">
+  </div>
+
+  <div class="actions">
+    <button id="saveBtn">Save</button>
+    <span class="saved" id="savedMsg">Saved!</span>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

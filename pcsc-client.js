@@ -19,6 +19,22 @@ const SCARD_PCI_T1 = { protocol: SCARD_PROTOCOL_T1 };
 const SCARD_S_SUCCESS = 0;
 const SCARD_LEAVE_CARD = 0;
 
+// SCardGetStatusChange state flags
+const SCARD_STATE_UNAWARE = 0x0000;
+const SCARD_STATE_IGNORE = 0x0001;
+const SCARD_STATE_CHANGED = 0x0002;
+const SCARD_STATE_UNKNOWN = 0x0004;
+const SCARD_STATE_UNAVAILABLE = 0x0008;
+const SCARD_STATE_EMPTY = 0x0010;
+const SCARD_STATE_PRESENT = 0x0020;
+const SCARD_STATE_MUTE = 0x0200;
+
+const SCARD_INFINITE = 0xFFFFFFFF;
+
+// Error codes
+const SCARD_E_TIMEOUT = 0x8010000A;
+const SCARD_E_CANCELLED = 0x80100002;
+
 // GET DATA pseudo-APDU to read card UID
 const GET_UID_APDU = [0xFF, 0xCA, 0x00, 0x00, 0x00];
 
@@ -181,6 +197,27 @@ class PcscClient {
    */
   async disconnect(cardHandle) {
     return this._call('SCardDisconnect', [cardHandle, SCARD_LEAVE_CARD]);
+  }
+
+  /**
+   * SCardGetStatusChange — block until card state changes or timeout.
+   * readerStates is an array of { reader_name, current_state }.
+   * Returns updated reader states with event_state bitmask.
+   */
+  async getStatusChange(timeout, readerStates) {
+    if (this._context === null) throw new Error('No context established');
+    const result = await this._call('SCardGetStatusChange', [
+      this._context, timeout, readerStates
+    ]);
+    return result[0]; // array of updated reader state objects
+  }
+
+  /**
+   * SCardCancel — cancel a pending SCardGetStatusChange call.
+   */
+  async cancel() {
+    if (this._context === null) return;
+    return this._call('SCardCancel', [this._context]);
   }
 
   /**

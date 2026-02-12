@@ -16,10 +16,28 @@ let currentState = {
   readerName: null,
   cardUid: null,
   cardAtr: null,
+  cardInfo: null,       // { cardType, standard, cardName, rid, historicalBytes }
   error: null,
-  apiRequest: null,   // { url, body, timestamp }
-  apiResponse: null,  // { status, body, timestamp } or { error, timestamp }
+  apiRequest: null,     // { url, headers, body, timestamp }
+  apiResponse: null,    // { status, statusText, headers, body, duration, timestamp } or { error, duration, timestamp }
 };
+
+// Rolling debug event log (last 50 entries)
+const MAX_LOG_ENTRIES = 50;
+let debugLog = [];
+
+function addLog(level, message, detail) {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    level, // 'info' | 'warn' | 'error'
+    message,
+  };
+  if (detail !== undefined) entry.detail = detail;
+  debugLog.push(entry);
+  if (debugLog.length > MAX_LOG_ENTRIES) debugLog.shift();
+  // Broadcast log update to popup
+  chrome.runtime.sendMessage({ type: 'logUpdate', log: debugLog }).catch(() => {});
+}
 
 let settings = {
   detectionMode: 'event',  // 'event' or 'poll'
@@ -77,42 +95,90 @@ function updateState(patch) {
   });
 }
 
-// Popup requests current state
+// Popup requests current state, debug log, or resend
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'getState') {
-    sendResponse({ state: currentState, settings });
+    sendResponse({ state: currentState, settings, log: debugLog });
+    return false;
+  }
+  if (msg.type === 'getLog') {
+    sendResponse({ log: debugLog });
+    return false;
+  }
+  if (msg.type === 'resendRequest') {
+    // Resend with optional overrides: { url, body }
+    const uid = (msg.body && msg.body.card_id) || (currentState.cardUid) || 'unknown';
+    addLog('info', 'Resend triggered from popup');
+    callEndpoint(uid, { url: msg.url, body: msg.body });
+    sendResponse({ ok: true });
+    return false;
+  }
+  if (msg.type === 'clearLog') {
+    debugLog = [];
+    sendResponse({ ok: true });
     return false;
   }
 });
 
 // --- Endpoint call ---
 
-async function callEndpoint(cardUid) {
-  if (!settings.endpointUrl) {
-    console.log('[bg] No endpoint URL configured, skipping API call');
+/**
+ * Call the configured endpoint, or resend with custom url/body.
+ * @param {string} cardUid - Card UID (used to build default body)
+ * @param {object} [overrides] - Optional { url, body } for resend
+ */
+async function callEndpoint(cardUid, overrides) {
+  const url = (overrides && overrides.url) || settings.endpointUrl;
+  if (!url) {
+    const msg = 'No endpoint URL configured, skipping API call';
+    console.log('[bg]', msg);
+    addLog('warn', msg);
     return;
   }
 
-  const url = settings.endpointUrl;
-  const body = {
-    card_id: cardUid,
-    venue_id: settings.venueId,
-    client_id: settings.clientId,
-  };
+  let body;
+  if (overrides && overrides.body) {
+    body = overrides.body;
+  } else {
+    body = {
+      card_id: cardUid,
+      venue_id: settings.venueId,
+      client_id: settings.clientId,
+    };
+    // Include card metadata if available
+    if (currentState.cardAtr) {
+      body.card_atr = currentState.cardAtr;
+    }
+    if (currentState.cardInfo) {
+      const ci = currentState.cardInfo;
+      if (ci.cardName) body.card_name = ci.cardName;
+      if (ci.standard) body.card_standard = ci.standard;
+      if (ci.cardType) body.card_type = ci.cardType;
+      if (ci.rid) body.card_rid = ci.rid;
+    }
+  }
+
+  const requestHeaders = { 'Content-Type': 'application/json' };
 
   const apiRequest = {
     url,
+    headers: requestHeaders,
     body,
     timestamp: new Date().toISOString(),
   };
   updateState({ apiRequest, apiResponse: null });
+  addLog('info', 'Sending POST to ' + url, body);
+
+  const startTime = performance.now();
 
   try {
     const resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: requestHeaders,
       body: JSON.stringify(body),
     });
+
+    const duration = Math.round(performance.now() - startTime);
 
     let respBody;
     const contentType = resp.headers.get('content-type') || '';
@@ -122,20 +188,37 @@ async function callEndpoint(cardUid) {
       respBody = await resp.text();
     }
 
+    // Collect response headers
+    const respHeaders = {};
+    resp.headers.forEach((value, key) => {
+      respHeaders[key] = value;
+    });
+
     const apiResponse = {
       status: resp.status,
+      statusText: resp.statusText,
+      headers: respHeaders,
       body: respBody,
+      duration,
       timestamp: new Date().toISOString(),
     };
     updateState({ apiResponse });
     console.log('[bg] API response:', resp.status, respBody);
+    addLog(
+      resp.status >= 200 && resp.status < 300 ? 'info' : 'warn',
+      `Response: ${resp.status} ${resp.statusText} (${duration}ms)`,
+      respBody
+    );
   } catch (e) {
+    const duration = Math.round(performance.now() - startTime);
     const apiResponse = {
       error: e.message,
+      duration,
       timestamp: new Date().toISOString(),
     };
     updateState({ apiResponse });
     console.warn('[bg] API call failed:', e.message);
+    addLog('error', 'Request failed: ' + e.message);
   }
 }
 
@@ -152,10 +235,12 @@ async function readCard(readerName) {
   try {
     const uid = await client.readCardUid(card.handle, card.protocol);
     let atr = null;
+    let cardInfo = null;
     try {
       const st = await client.status(card.handle);
       if (st.atr && st.atr.length > 0) {
         atr = bytesToHex(st.atr);
+        cardInfo = parseAtr(st.atr);
       }
     } catch (_) {}
 
@@ -164,11 +249,13 @@ async function readCard(readerName) {
       readerName,
       cardUid: uid,
       cardAtr: atr,
+      cardInfo,
       error: null,
       apiRequest: null,
       apiResponse: null,
     });
     console.log('[bg] Card UID:', uid);
+    addLog('info', 'Card detected — UID: ' + (uid || '(none)'), { atr, ...(cardInfo || {}) });
 
     // Call the configured endpoint
     if (uid) {
@@ -247,6 +334,7 @@ async function runEventLoop() {
         if (currentState.status === 'card') {
           updateState({ status: 'ready', cardUid: null, cardAtr: null, error: null });
           console.log('[bg] Card removed');
+          addLog('info', 'Card removed');
         }
       }
 
@@ -279,6 +367,7 @@ async function runPollLoop() {
           activeCard = null;
           updateState({ status: 'ready', cardUid: null, cardAtr: null, error: null });
           console.log('[bg] Card removed (poll mode)');
+          addLog('info', 'Card removed (poll mode)');
           continue;
         }
       }
@@ -313,20 +402,30 @@ async function runPollLoop() {
         continue;
       }
 
-      // Card found — read UID and ATR
+      // Card found — read UID, ATR and card info
       let uid = null;
       let atr = null;
+      let cardInfo = null;
       try {
         uid = await client.readCardUid(card.handle, card.protocol);
       } catch (_) {}
       try {
         const st = await client.status(card.handle);
-        if (st.atr && st.atr.length > 0) atr = bytesToHex(st.atr);
+        if (st.atr && st.atr.length > 0) {
+          atr = bytesToHex(st.atr);
+          cardInfo = parseAtr(st.atr);
+        }
       } catch (_) {}
 
-      updateState({ status: 'card', cardUid: uid, cardAtr: atr, error: null });
+      updateState({ status: 'card', cardUid: uid, cardAtr: atr, cardInfo, error: null });
       console.log('[bg] Card UID (poll mode):', uid);
+      addLog('info', 'Card detected (poll) — UID: ' + (uid || '(none)'), { atr, ...(cardInfo || {}) });
       activeCard = { handle: card.handle, protocol: card.protocol };
+
+      // Call the configured endpoint
+      if (uid) {
+        await callEndpoint(uid);
+      }
 
     } catch (e) {
       updateState({ status: 'error', error: e.message });
@@ -350,11 +449,13 @@ async function start() {
     await client.establishContext();
   } catch (e) {
     updateState({ status: 'error', error: 'Failed to connect to Smart Card Connector: ' + e.message });
+    addLog('error', 'Failed to connect to Smart Card Connector', e.message);
     return;
   }
 
   updateState({ status: 'ready', error: null });
   console.log('[bg] Connected. Mode:', settings.detectionMode);
+  addLog('info', 'Connected to Smart Card Connector', { mode: settings.detectionMode });
 
   if (settings.detectionMode === 'event') {
     await runEventLoop();
